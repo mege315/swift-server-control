@@ -13,12 +13,19 @@ struct TemperatureResponse: Content {
     let celsius: Double
 }
 
+struct BatteryResponse: Content {
+    let capacity: Int
+    let status: String
+}
+
 struct SystemController: RouteCollection {
     func boot(routes: RoutesBuilder) throws {
         routes.post("power", use: managePower)
         routes.post("fan", use: setFanSpeed)
         routes.get("temperature", use: getTemperature)
         routes.get("api", "v1", "system", "temperature", use: getTemperature)
+        routes.get("battery", use: getBattery)
+        routes.get("api", "v1", "system", "battery", use: getBattery)
     }
 
     @Sendable
@@ -82,6 +89,46 @@ struct SystemController: RouteCollection {
 
         let celsius = milliCelsius / 1000.0
         return TemperatureResponse(celsius: celsius)
+    }
+
+    @Sendable
+    func getBattery(req: Request) async throws -> BatteryResponse {
+        guard let batteryPath = findBatteryPath() else {
+            throw Abort(.notFound, reason: "Battery not found.")
+        }
+
+        let capacityPath = "\(batteryPath)/capacity"
+        let statusPath = "\(batteryPath)/status"
+
+        guard let capacityString = try? String(contentsOfFile: capacityPath, encoding: .utf8),
+              let capacity = Int(capacityString.trimmingCharacters(in: .whitespacesAndNewlines)) else {
+            throw Abort(.internalServerError)
+        }
+
+        guard let statusString = try? String(contentsOfFile: statusPath, encoding: .utf8) else {
+            throw Abort(.internalServerError)
+        }
+
+        let status = statusString.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        return BatteryResponse(capacity: capacity, status: status)
+    }
+
+    private func findBatteryPath() -> String? {
+        let fileManager = FileManager.default
+        let powerSupplyBasePath = "/sys/class/power_supply"
+
+        guard let dirs = try? fileManager.contentsOfDirectory(atPath: powerSupplyBasePath) else {
+            return nil
+        }
+
+        for dir in dirs.sorted() {
+            if dir.hasPrefix("BAT") {
+                return "\(powerSupplyBasePath)/\(dir)"
+            }
+        }
+
+        return nil
     }
 
     private func getCoreTempPath() -> String? {
