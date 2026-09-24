@@ -18,6 +18,12 @@ struct BatteryResponse: Content {
     let status: String
 }
 
+struct MemoryResponse: Content {
+    let totalMB: Int
+    let availableMB: Int
+    let usedMB: Int
+}
+
 struct SystemController: RouteCollection {
     func boot(routes: RoutesBuilder) throws {
         routes.post("power", use: managePower)
@@ -26,6 +32,8 @@ struct SystemController: RouteCollection {
         routes.get("api", "v1", "system", "temperature", use: getTemperature)
         routes.get("battery", use: getBattery)
         routes.get("api", "v1", "system", "battery", use: getBattery)
+        routes.get("memory", use: getMemory)
+        routes.get("api", "v1", "system", "memory", use: getMemory)
     }
 
     @Sendable
@@ -112,6 +120,37 @@ struct SystemController: RouteCollection {
         let status = statusString.trimmingCharacters(in: .whitespacesAndNewlines)
 
         return BatteryResponse(capacity: capacity, status: status)
+    }
+
+    @Sendable
+    func getMemory(req: Request) async throws -> MemoryResponse {
+        guard let meminfo = try? String(contentsOfFile: "/proc/meminfo", encoding: .utf8) else {
+            throw Abort(.internalServerError, reason: "Memory information could not be read.")
+        }
+
+        var memTotalKB: Int?
+        var memAvailableKB: Int?
+
+        let lines = meminfo.components(separatedBy: .newlines)
+        for line in lines {
+            if line.hasPrefix("MemTotal:") {
+                let digits = line.filter { $0.isNumber }
+                memTotalKB = Int(digits)
+            } else if line.hasPrefix("MemAvailable:") {
+                let digits = line.filter { $0.isNumber }
+                memAvailableKB = Int(digits)
+            }
+        }
+
+        guard let totalKB = memTotalKB, let availableKB = memAvailableKB else {
+            throw Abort(.internalServerError, reason: "Failed to parse memory information.")
+        }
+
+        let totalMB = totalKB / 1024
+        let availableMB = availableKB / 1024
+        let usedMB = totalMB - availableMB
+
+        return MemoryResponse(totalMB: totalMB, availableMB: availableMB, usedMB: usedMB)
     }
 
     private func findBatteryPath() -> String? {
