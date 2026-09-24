@@ -18,6 +18,20 @@ echo "mege ALL=(ALL) NOPASSWD: /sbin/reboot, /sbin/shutdown" | sudo tee /etc/sud
 
 > **Security Note:** This configuration strictly limits passwordless elevation to `/sbin/reboot` and `/sbin/shutdown`, maintaining the security of the host system.
 
+### Hardware Fan Control (Optional)
+
+For devices that expose PWM fan control via `sysfs` (e.g., Raspberry Pi, desktop motherboards), the API requires write permissions to the hardware monitoring nodes. Instead of running the entire Vapor server as root, it is recommended to apply a `udev` rule to grant necessary permissions dynamically.
+
+Run the following commands to create and apply the rule:
+
+```bash
+echo 'ACTION=="add", SUBSYSTEM=="hwmon", RUN+="/bin/chmod 666 /sys/class/hwmon/%k/pwm*"' | sudo tee /etc/udev/rules.d/99-fan-control.rules
+sudo udevadm control --reload-rules
+sudo udevadm trigger
+```
+
+> **Note:** Many enterprise laptops (like HP EliteBooks) lock fan control to the Embedded Controller (EC) and ACPI. On such devices, the API will safely return a `500 Internal Server Error` rather than attempting unsafe register modifications.
+
 ### Tech Stack
 - **Language:** Swift 5.10+
 - **Framework:** Vapor 4

@@ -40,27 +40,46 @@ struct SystemController: RouteCollection {
 
     @Sendable
     func setFanSpeed(req: Request) async throws -> String {
+        guard let pwmPath = findPWMPath() else {
+            throw Abort(.notFound, reason: "No controllable fan (PWM) sensor found on the system.")
+        }
+
         let command = try req.content.decode(FanCommand.self)
 
         guard (0...255).contains(command.speed) else {
             throw Abort(.badRequest, reason: "Speed must be between 0 and 255.")
         }
 
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/sudo")
-        process.arguments = ["sh", "-c", "echo \(command.speed) > /sys/class/hwmon/hwmon0/pwm1"]
-
         do {
-            try process.run()
-            process.waitUntilExit()
+            try String(command.speed).write(toFile: pwmPath, atomically: false, encoding: .utf8)
         } catch {
             throw Abort(.internalServerError)
         }
 
-        guard process.terminationStatus == 0 else {
-            throw Abort(.internalServerError)
+        return "Fan speed successfully set to \(command.speed)."
+    }
+
+    private func findPWMPath() -> String? {
+        let fileManager = FileManager.default
+        let hwmonBasePath = "/sys/class/hwmon"
+
+        guard let hwmonDirs = try? fileManager.contentsOfDirectory(atPath: hwmonBasePath) else {
+            return nil
         }
 
-        return "Fan speed successfully set to \(command.speed)."
+        for dir in hwmonDirs.sorted() {
+            let dirPath = "\(hwmonBasePath)/\(dir)"
+            guard let files = try? fileManager.contentsOfDirectory(atPath: dirPath) else {
+                continue
+            }
+
+            for file in files.sorted() {
+                if file.contains("pwm") {
+                    return "\(dirPath)/\(file)"
+                }
+            }
+        }
+
+        return nil
     }
 }
