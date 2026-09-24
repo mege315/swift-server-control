@@ -10,10 +10,13 @@ To allow the API to safely manage system power states (reboot/shutdown) without 
 
 Run the following command on your host machine to create a secure drop-in sudoers rule (replace `mege` with your actual Linux username):
 
+Run the following command on your host machine to create a secure drop-in sudoers rule (replace `mege` with your actual Linux username):
+
 ```bash
 echo "mege ALL=(ALL) NOPASSWD: /sbin/reboot, /sbin/shutdown" | sudo tee /etc/sudoers.d/vapor_power
+```
 
-Security Note: This configuration strictly limits passwordless elevation to /sbin/reboot and /sbin/shutdown, maintaining the security of the host system.
+> **Security Note:** This configuration strictly limits passwordless elevation to `/sbin/reboot` and `/sbin/shutdown`, maintaining the security of the host system.
 
 ### Tech Stack
 - **Language:** Swift 5.10+
