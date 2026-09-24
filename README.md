@@ -4,6 +4,17 @@
 
 By directly reading from the Linux `/sys/class/` file system, the API serves real-time data such as battery capacity and charging status, with planned extensibility for PWM fan control and system power management. It is optimized for secure, local network execution (e.g., via Tailscale).
 
+## System Configuration for Power Management
+
+To allow the API to safely manage system power states (reboot/shutdown) without requiring an interactive password prompt, you must grant passwordless `sudo` execution specifically for those two commands.
+
+Run the following command on your host machine to create a secure drop-in sudoers rule (replace `mege` with your actual Linux username):
+
+```bash
+echo "mege ALL=(ALL) NOPASSWD: /sbin/reboot, /sbin/shutdown" | sudo tee /etc/sudoers.d/vapor_power
+
+Security Note: This configuration strictly limits passwordless elevation to /sbin/reboot and /sbin/shutdown, maintaining the security of the host system.
+
 ### Tech Stack
 - **Language:** Swift 5.10+
 - **Framework:** Vapor 4
