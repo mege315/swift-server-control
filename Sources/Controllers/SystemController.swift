@@ -24,6 +24,13 @@ struct MemoryResponse: Content {
     let usedMB: Int
 }
 
+struct SystemStatusResponse: Content {
+    let uptimeSeconds: Double
+    let load1: Double
+    let load5: Double
+    let load15: Double
+}
+
 struct SystemController: RouteCollection {
     func boot(routes: RoutesBuilder) throws {
         routes.post("power", use: managePower)
@@ -34,6 +41,8 @@ struct SystemController: RouteCollection {
         routes.get("api", "v1", "system", "battery", use: getBattery)
         routes.get("memory", use: getMemory)
         routes.get("api", "v1", "system", "memory", use: getMemory)
+        routes.get("status", use: getStatus)
+        routes.get("api", "v1", "system", "status", use: getStatus)
     }
 
     @Sendable
@@ -151,6 +160,33 @@ struct SystemController: RouteCollection {
         let usedMB = totalMB - availableMB
 
         return MemoryResponse(totalMB: totalMB, availableMB: availableMB, usedMB: usedMB)
+    }
+
+    @Sendable
+    func getStatus(req: Request) async throws -> SystemStatusResponse {
+        guard let uptimeContent = try? String(contentsOfFile: "/proc/uptime", encoding: .utf8) else {
+            throw Abort(.internalServerError, reason: "Uptime data could not be read.")
+        }
+
+        let uptimeParts = uptimeContent.split(separator: " ")
+        guard let firstUptimePart = uptimeParts.first,
+              let uptimeSeconds = Double(firstUptimePart) else {
+            throw Abort(.internalServerError, reason: "Uptime data could not be read.")
+        }
+
+        guard let loadavgContent = try? String(contentsOfFile: "/proc/loadavg", encoding: .utf8) else {
+            throw Abort(.internalServerError, reason: "Load average data could not be read.")
+        }
+
+        let loadParts = loadavgContent.split(separator: " ")
+        guard loadParts.count >= 3,
+              let load1 = Double(loadParts[0]),
+              let load5 = Double(loadParts[1]),
+              let load15 = Double(loadParts[2]) else {
+            throw Abort(.internalServerError, reason: "Load average data could not be read.")
+        }
+
+        return SystemStatusResponse(uptimeSeconds: uptimeSeconds, load1: load1, load5: load5, load15: load15)
     }
 
     private func findBatteryPath() -> String? {
