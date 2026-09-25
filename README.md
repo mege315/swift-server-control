@@ -4,6 +4,12 @@
 
 By directly reading from the Linux `/sys/class/` file system, the API serves real-time data such as battery capacity and charging status, with planned extensibility for PWM fan control and system power management. It is optimized for secure, local network execution (e.g., via Tailscale).
 
+## Architecture
+
+This project is divided into two independent repositories:
+
+1. [**Backend (Vapor on Linux)**](https://github.com/mege315/swift-server-control): A lightweight server that interfaces directly with Linux virtual file systems (`/sys` and `/proc`) and `FileManager` to fetch low-level hardware metrics without relying on external terminal commands.
+2. [**Client (SwiftUI)**](https://github.com/mege315/ServerMonitor-Client): A modern, responsive dashboard utilizing `async/await`, `URLSession`, and custom `Gauge` components for real-time visualization on Apple platforms.
 ## System Configuration for Power Management
 
 To allow the API to safely manage system power states (reboot/shutdown) without requiring an interactive password prompt, you must grant passwordless `sudo` execution specifically for those two commands.
