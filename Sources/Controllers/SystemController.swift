@@ -31,6 +31,12 @@ struct SystemStatusResponse: Content {
     let load15: Double
 }
 
+struct DiskResponse: Content {
+    let totalGB: Double
+    let freeGB: Double
+    let usedGB: Double
+}
+
 struct SystemController: RouteCollection {
     func boot(routes: RoutesBuilder) throws {
         routes.post("power", use: managePower)
@@ -43,6 +49,8 @@ struct SystemController: RouteCollection {
         routes.get("api", "v1", "system", "memory", use: getMemory)
         routes.get("status", use: getStatus)
         routes.get("api", "v1", "system", "status", use: getStatus)
+        routes.get("disk", use: getDisk)
+        routes.get("api", "v1", "system", "disk", use: getDisk)
     }
 
     @Sendable
@@ -187,6 +195,25 @@ struct SystemController: RouteCollection {
         }
 
         return SystemStatusResponse(uptimeSeconds: uptimeSeconds, load1: load1, load5: load5, load15: load15)
+    }
+
+    @Sendable
+    func getDisk(req: Request) async throws -> DiskResponse {
+        guard let attributes = try? FileManager.default.attributesOfFileSystem(forPath: "/") else {
+            throw Abort(.internalServerError, reason: "Disk information could not be read.")
+        }
+
+        guard let systemSize = attributes[.systemSize] as? NSNumber,
+              let systemFreeSize = attributes[.systemFreeSize] as? NSNumber else {
+            throw Abort(.internalServerError, reason: "Disk information could not be read.")
+        }
+
+        let bytesPerGB: Double = 1_073_741_824.0
+        let totalGB = ((systemSize.doubleValue / bytesPerGB) * 100.0).rounded() / 100.0
+        let freeGB = ((systemFreeSize.doubleValue / bytesPerGB) * 100.0).rounded() / 100.0
+        let usedGB = ((totalGB - freeGB) * 100.0).rounded() / 100.0
+
+        return DiskResponse(totalGB: totalGB, freeGB: freeGB, usedGB: usedGB)
     }
 
     private func findBatteryPath() -> String? {
